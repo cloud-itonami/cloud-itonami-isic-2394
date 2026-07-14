@@ -58,9 +58,11 @@
 
 (defn- simulate-robotics!
   "Walks `subject` through the robot quality-lab verification mission
-  -> approve, leaving `:robotics-sim-verified?` on file. Only
-  meaningful to call for a batch whose 28-day strength is actually
-  within tolerance -- an out-of-tolerance batch still gets
+  -> approve, leaving `:robotics-sim-verified?` on file. This now
+  ACTUALLY runs the real `physics-2d`-backed press-collision simulation
+  for the batch's own :press-platen-mass-kg (ADR-2607152000) -- only
+  meaningful to call for a batch whose real simulated press reading is
+  actually within tolerance -- an out-of-tolerance batch still gets
   :robotics-sim-verified? recorded (per whatever the mission itself
   found: false), but `cementmill.governor`'s independent recheck
   HARD-holds regardless."
@@ -191,7 +193,7 @@
       (is (empty? (store/shipment-history db))))))
 
 (deftest robotics-simulation-out-of-tolerance-is-held
-  (testing "batch-5 has a robotics-sim already on file, but its own 28-day strength reading falls outside its own tolerance bounds on INDEPENDENT recheck -> HOLD, never trusts the on-file verdict alone (co-fires with cement-batch-strength-out-of-range -- see ns docstring)"
+  (testing "batch-5 has a robotics-sim already on file, but its own REAL physics-2d-simulated press telemetry (:sim-peak-compressive-stress-mpa -- ADR-2607152000) falls outside its own real [:strength-28d-min :strength-28d-max] band on INDEPENDENT recheck -> HOLD, never trusts the on-file verdict alone (co-fires with cement-batch-strength-out-of-range -- see ns docstring). batch-5 is DELIBERATELY press-tested with an unrealistically heavy 16.5kg platen-mass configuration in the demo fixture (cementmill.store/demo-data) -- a genuine press-run-record inconsistency the real, re-run simulation catches."
     (let [[db actor] (fresh)
           _ (verify! actor "t13pre" "batch-5")
           res (exec-op actor "t13" {:op :actuation/ship-cement-batch :subject "batch-5"} operator)]

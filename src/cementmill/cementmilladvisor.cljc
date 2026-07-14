@@ -110,11 +110,17 @@
 
 (defn- simulate-quality-lab-cell
   "Runs the robot quality-lab verification mission
-  (`cementmill.robotics`) and drafts its result as a proposal. High
-  confidence -- the mission itself is deterministic simulated
-  telemetry derived from the batch's own recorded 28-day compressive-
-  strength fields, not an LLM guess; the Kiln Governor still
-  independently re-derives :passed? from those same fields before any
+  (`cementmill.robotics`) and drafts its result as a proposal. This now
+  ACTUALLY runs a real `physics-2d`-backed time-stepped press-platen /
+  cube-specimen collision simulation (ADR-2607152000, extending the
+  automotive pilot ADR-2607151600) -- the batch's own recorded
+  `:press-platen-mass-kg` press-run configuration becomes an actual
+  `Body2D` stepped tick-by-tick into a static cube specimen; see
+  `cementmill.robotics/simulate-quality-lab-cell`'s docstring. High
+  confidence -- the mission itself is deterministic simulated telemetry
+  derived from the batch's own recorded press-run configuration (never
+  an LLM guess); the Kiln Governor still independently re-derives
+  :passed? from the real telemetry fields this drafts before any
   `:actuation/ship-cement-batch` proposal may commit -- see
   `cementmill.governor`'s `robotics-simulation-violations`."
   [db {:keys [subject]}]
@@ -123,14 +129,18 @@
       {:summary "対象バッチ記録が見つかりません" :rationale "no batch record"
        :cites [] :effect :cement-batch/upsert :value {:id subject :robotics-sim-verified? false}
        :stake nil :confidence 0.0}
-      (let [{:keys [mission actions passed?]} (robotics/simulate-quality-lab-cell subject a)]
+      (let [{:keys [mission actions passed? sim-peak-compressive-force-n sim-peak-compressive-stress-mpa]}
+            (robotics/simulate-quality-lab-cell subject a)]
         {:summary    (str subject ": 品質ラボロボット検証ミッション " (if passed? "合格" "不合格"))
          :rationale  (str "mission=" (:mission/id mission) " actions=" (count actions)
-                          " strength-28d-actual=" (:strength-28d-actual a))
+                          " sim-peak-compressive-stress-mpa=" sim-peak-compressive-stress-mpa
+                          " strength-28d-band=[" (:strength-28d-min a) "," (:strength-28d-max a) "]")
          :cites      [(:mission/id mission)]
          :effect     :cement-batch/upsert
          :value      {:id subject
                       :robotics-sim-verified? passed?
+                      :sim-peak-compressive-force-n sim-peak-compressive-force-n
+                      :sim-peak-compressive-stress-mpa sim-peak-compressive-stress-mpa
                       :robotics-sim-record {:mission-id (:mission/id mission)
                                             :actions (mapv #(dissoc % :action) actions)
                                             :passed? passed?}}

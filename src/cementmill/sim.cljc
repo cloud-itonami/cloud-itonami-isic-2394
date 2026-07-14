@@ -1,5 +1,10 @@
 (ns cementmill.sim
-  "Demo driver -- `clojure -M:dev:run`. Walks a clean cement batch
+  "Demo driver -- `clojure -M:dev:run`. `robotics/simulate-quality-lab-
+  cell` now actually runs a real `physics-2d`-backed time-stepped
+  press-platen/cube-specimen collision simulation (ADR-2607152000,
+  extending automotive's pilot ADR-2607151600) -- see
+  `cementmill.robotics` for what is genuinely simulated vs. disclosed
+  simplification. Walks a clean cement batch
   through intake -> quality-standard requirements verification ->
   kiln-emissions screening -> robot quality-lab mission ->
   cement-batch-shipment proposal (always escalates) -> human approval
@@ -71,14 +76,14 @@
     (println "== actuation/ship-cement-batch batch-3 before robotics simulation -> HARD hold (robotics-simulation-missing; cement-batch-strength-out-of-range co-fires too, since batch-3's 30.0 is already out of [42.5,62.5] independent of robotics state -- see cementmill.robotics ns docstring on why both checks share the same 28-day-strength field family) ==")
     (println (exec! actor "t7b" {:op :actuation/ship-cement-batch :subject "batch-3"} operator))
 
-    (println "== robotics/simulate-quality-lab-cell batch-3 (out-of-spec strength; escalates -- human approves; mission itself records :passed? false) ==")
+    (println "== robotics/simulate-quality-lab-cell batch-3 (real physics-2d press simulation of this batch's 7.0kg press config genuinely falls below its own [42.5,62.5] band; escalates -- human approves; mission itself records :passed? false) ==")
     (println (exec! actor "t7c" {:op :robotics/simulate-quality-lab-cell :subject "batch-3"} operator))
     (println (approve! actor "t7c"))
 
     (println "== actuation/ship-cement-batch batch-3 (30.0 outside [42.5,62.5] strength tolerance -> still HARD hold: robotics-simulation-missing [mission ran but recorded :passed? false, so never :robotics-sim-verified? true] + cement-batch-strength-out-of-range) ==")
     (println (exec! actor "t8" {:op :actuation/ship-cement-batch :subject "batch-3"} operator))
 
-    (println "== actuation/ship-cement-batch batch-5 (robotics-sim PRE-SEEDED :robotics-sim-verified? true, but 28-day strength 65.0 outside [42.5,62.5] tolerance on independent recheck -> HARD hold: robotics-simulation-out-of-tolerance + cement-batch-strength-out-of-range, the governor never trusts the stale on-file verdict alone) ==")
+    (println "== actuation/ship-cement-batch batch-5 (robotics-sim PRE-SEEDED :robotics-sim-verified? true, but a real re-run physics-2d press simulation of this deliberately-misconfigured 16.5kg platen-mass config genuinely exceeds its own [42.5,62.5] band on independent recheck -> HARD hold: robotics-simulation-out-of-tolerance + cement-batch-strength-out-of-range, the governor never trusts the stale on-file verdict alone) ==")
     (println (exec! actor "t8b" {:op :quality-standard/verify :subject "batch-5"} operator))
     (println (approve! actor "t8b"))
     (println (exec! actor "t8c" {:op :actuation/ship-cement-batch :subject "batch-5"} operator))

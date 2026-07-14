@@ -36,6 +36,7 @@
   (:require #?(:clj  [clojure.edn :as edn]
                :cljs [cljs.reader :as edn])
             [cementmill.registry :as registry]
+            [cementmill.robotics :as robotics]
             [langchain.db :as d]))
 
 (defprotocol Store
@@ -56,42 +57,84 @@
 
 ;; ----------------------------- demo data -----------------------------
 
+(defn- with-press-telemetry
+  "Merges REAL press-collision telemetry onto a demo batch's base
+  fields -- `cementmill.robotics/press-telemetry-for` actually runs a
+  `physics-2d`-stepped press-platen/cube-specimen collision simulation
+  for this batch's own `:press-platen-mass-kg` press-run configuration
+  (ADR-2607152000), so even the 'already on file' seed data (as if from
+  an earlier real compressive-strength-press run) is genuinely
+  simulation-derived, never hand-typed doubles."
+  [base]
+  (merge base (select-keys (robotics/press-telemetry-for base)
+                           [:sim-peak-compressive-force-n :sim-peak-compressive-stress-mpa
+                            :sim-peak-crush-distance-m])))
+
 (defn demo-data
   "A small, self-contained cement-batch set covering both actuation
   lifecycles (shipping a batch, issuing a Mill Test Certificate) so
-  the actor + tests run offline."
+  the actor + tests run offline. `:strength-28d-actual`/`:strength-28d-
+  min`/`:strength-28d-max` remain this batch's own already-certified
+  lab-recorded 28-day strength band (unchanged -- `cementmill.registry/
+  cement-batch-strength-out-of-range?`'s real, established anchor);
+  `:press-platen-mass-kg` is a NEW, real per-batch press-run
+  configuration field (ADR-2607152000) -- `with-press-telemetry` runs
+  the REAL `physics-2d` press simulation for it, producing
+  `:sim-peak-compressive-force-n`/`:sim-peak-compressive-stress-mpa`,
+  the ground truth `cementmill.robotics/simulation-out-of-tolerance?`
+  independently rechecks against the SAME `:strength-28d-min`/
+  `:strength-28d-max` band. batch-1/2/4 use the mill's own standard
+  press-platen-mass (12.0/12.0/14.0 kg -- clears its own band with
+  margin); batch-3's lighter 7.0 kg reading lands below its own band,
+  consistent with its already-known 30.0 out-of-spec strength. batch-5
+  (blast-furnace-slag cement, seeded `:robotics-sim-verified? true`,
+  i.e. 'already on file') is DELIBERATELY press-tested with an
+  unrealistically heavy 16.5 kg platen-mass configuration -- a genuine
+  press-run-record inconsistency (no real QC lab uses a heavier platen
+  for one batch than its own standard SOP) that the real, re-run
+  simulation catches on independent recheck even though the mission was
+  marked passed without this real check ever having run -- the
+  cement-mill analog of automotive's vehicle-5 misclassified-:city
+  fixture (ADR-2607151600)."
   []
   {:cement-batches
-   {"batch-1" {:id "batch-1" :batch-name "Ordinary Portland Cement Batch OPC-42.5N-104"
-               :strength-28d-actual 47.0 :strength-28d-min 42.5 :strength-28d-max 62.5
-               :kiln-emissions-unresolved? false
-               :robotics-sim-verified? false :robotics-sim-record nil
-               :batch-shipped? false :mill-certified? false
-               :jurisdiction "JPN" :status :intake}
-    "batch-2" {:id "batch-2" :batch-name "Ordinary Portland Cement Batch OPC-42.5N-207"
-               :strength-28d-actual 47.0 :strength-28d-min 42.5 :strength-28d-max 62.5
-               :kiln-emissions-unresolved? false
-               :robotics-sim-verified? false :robotics-sim-record nil
-               :batch-shipped? false :mill-certified? false
-               :jurisdiction "ATL" :status :intake}
-    "batch-3" {:id "batch-3" :batch-name "普通ポルトランドセメント バッチ OPC-42.5N-311"
-               :strength-28d-actual 30.0 :strength-28d-min 42.5 :strength-28d-max 62.5
-               :kiln-emissions-unresolved? false
-               :robotics-sim-verified? false :robotics-sim-record nil
-               :batch-shipped? false :mill-certified? false
-               :jurisdiction "JPN" :status :intake}
-    "batch-4" {:id "batch-4" :batch-name "早強ポルトランドセメント バッチ RPC-52.5R-412"
-               :strength-28d-actual 55.0 :strength-28d-min 52.5 :strength-28d-max 72.5
-               :kiln-emissions-unresolved? true
-               :robotics-sim-verified? false :robotics-sim-record nil
-               :batch-shipped? false :mill-certified? false
-               :jurisdiction "JPN" :status :intake}
-    "batch-5" {:id "batch-5" :batch-name "高炉セメントB種 バッチ BFS-B-509"
-               :strength-28d-actual 65.0 :strength-28d-min 42.5 :strength-28d-max 62.5
-               :kiln-emissions-unresolved? false
-               :robotics-sim-verified? true :robotics-sim-record nil
-               :batch-shipped? false :mill-certified? false
-               :jurisdiction "JPN" :status :intake}}})
+   (into {}
+         (map (fn [b] [(:id b) (with-press-telemetry b)]))
+         [{:id "batch-1" :batch-name "Ordinary Portland Cement Batch OPC-42.5N-104"
+           :strength-28d-actual 47.0 :strength-28d-min 42.5 :strength-28d-max 62.5
+           :press-platen-mass-kg 12.0
+           :kiln-emissions-unresolved? false
+           :robotics-sim-verified? false :robotics-sim-record nil
+           :batch-shipped? false :mill-certified? false
+           :jurisdiction "JPN" :status :intake}
+          {:id "batch-2" :batch-name "Ordinary Portland Cement Batch OPC-42.5N-207"
+           :strength-28d-actual 47.0 :strength-28d-min 42.5 :strength-28d-max 62.5
+           :press-platen-mass-kg 12.0
+           :kiln-emissions-unresolved? false
+           :robotics-sim-verified? false :robotics-sim-record nil
+           :batch-shipped? false :mill-certified? false
+           :jurisdiction "ATL" :status :intake}
+          {:id "batch-3" :batch-name "普通ポルトランドセメント バッチ OPC-42.5N-311"
+           :strength-28d-actual 30.0 :strength-28d-min 42.5 :strength-28d-max 62.5
+           :press-platen-mass-kg 7.0
+           :kiln-emissions-unresolved? false
+           :robotics-sim-verified? false :robotics-sim-record nil
+           :batch-shipped? false :mill-certified? false
+           :jurisdiction "JPN" :status :intake}
+          {:id "batch-4" :batch-name "早強ポルトランドセメント バッチ RPC-52.5R-412"
+           :strength-28d-actual 55.0 :strength-28d-min 52.5 :strength-28d-max 72.5
+           :press-platen-mass-kg 14.0
+           :kiln-emissions-unresolved? true
+           :robotics-sim-verified? false :robotics-sim-record nil
+           :batch-shipped? false :mill-certified? false
+           :jurisdiction "JPN" :status :intake}
+          {:id "batch-5" :batch-name "高炉セメントB種 バッチ BFS-B-509"
+           :strength-28d-actual 65.0 :strength-28d-min 42.5 :strength-28d-max 62.5
+           :press-platen-mass-kg 16.5
+           :kiln-emissions-unresolved? false
+           :robotics-sim-verified? true :robotics-sim-record nil
+           :batch-shipped? false :mill-certified? false
+           :jurisdiction "JPN" :status :intake}])})
 
 ;; ----------------------------- shared commit logic -----------------------------
 
@@ -200,6 +243,7 @@
 (defn- dec* [s] (when s (edn/read-string s)))
 
 (defn- batch->tx [{:keys [id batch-name strength-28d-actual strength-28d-min strength-28d-max
+                           press-platen-mass-kg sim-peak-compressive-force-n sim-peak-compressive-stress-mpa
                            kiln-emissions-unresolved? robotics-sim-verified? robotics-sim-record
                            batch-shipped? mill-certified?
                            jurisdiction status shipment-number evidence-number]}]
@@ -208,6 +252,9 @@
     strength-28d-actual                        (assoc :batch/strength-28d-actual strength-28d-actual)
     strength-28d-min                           (assoc :batch/strength-28d-min strength-28d-min)
     strength-28d-max                           (assoc :batch/strength-28d-max strength-28d-max)
+    press-platen-mass-kg                        (assoc :batch/press-platen-mass-kg press-platen-mass-kg)
+    sim-peak-compressive-force-n                 (assoc :batch/sim-peak-compressive-force-n sim-peak-compressive-force-n)
+    (some? sim-peak-compressive-stress-mpa)     (assoc :batch/sim-peak-compressive-stress-mpa sim-peak-compressive-stress-mpa)
     (some? kiln-emissions-unresolved?)         (assoc :batch/kiln-emissions-unresolved? kiln-emissions-unresolved?)
     (some? robotics-sim-verified?)              (assoc :batch/robotics-sim-verified? robotics-sim-verified?)
     (some? robotics-sim-record)                 (assoc :batch/robotics-sim-record (enc robotics-sim-record))
@@ -221,6 +268,7 @@
 (def ^:private batch-pull
   [:batch/id :batch/batch-name :batch/strength-28d-actual
    :batch/strength-28d-min :batch/strength-28d-max
+   :batch/press-platen-mass-kg :batch/sim-peak-compressive-force-n :batch/sim-peak-compressive-stress-mpa
    :batch/kiln-emissions-unresolved? :batch/robotics-sim-verified? :batch/robotics-sim-record
    :batch/batch-shipped? :batch/mill-certified?
    :batch/jurisdiction :batch/status :batch/shipment-number :batch/evidence-number])
@@ -231,6 +279,9 @@
      :strength-28d-actual (:batch/strength-28d-actual m)
      :strength-28d-min (:batch/strength-28d-min m)
      :strength-28d-max (:batch/strength-28d-max m)
+     :press-platen-mass-kg (:batch/press-platen-mass-kg m)
+     :sim-peak-compressive-force-n (:batch/sim-peak-compressive-force-n m)
+     :sim-peak-compressive-stress-mpa (:batch/sim-peak-compressive-stress-mpa m)
      :kiln-emissions-unresolved? (boolean (:batch/kiln-emissions-unresolved? m))
      :robotics-sim-verified? (boolean (:batch/robotics-sim-verified? m))
      :robotics-sim-record (dec* (:batch/robotics-sim-record m))

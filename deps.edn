@@ -9,7 +9,21 @@
  :deps {io.github.kotoba-lang/langgraph
         {:local/root "../../kotoba-lang/langgraph"}
         io.github.kotoba-lang/robotics
-        {:local/root "../../kotoba-lang/robotics"}}
+        {:local/root "../../kotoba-lang/robotics"}
+        ;; REAL engineering-simulation dependency (ADR-2607152000, extending
+        ;; ADR-2607151600's automotive pilot to this vertical): cementmill.
+        ;; robotics now actually builds physics-2d Body2D/Collider2D
+        ;; entities and runs a real time-stepped world-step press-platen /
+        ;; cube-specimen collision simulation, deriving :sim-peak-
+        ;; compressive-force-n/:sim-peak-compressive-stress-mpa from the
+        ;; ACTUAL simulated trajectory -- instead of comparing a static
+        ;; self-reported field. Built directly inside this actor's own
+        ;; cementmill.robotics ns (no separate design-library sibling repo,
+        ;; unlike automotive's kami-engine-vehicle-designer pairing --
+        ;; ADR-2607152000's own key simplification).
+        io.github.kotoba-lang/physics-2d
+        {:git/url "https://github.com/kotoba-lang/physics-2d.git"
+         :sha "03b6c23c8d9aa36b92a8130fd3e37fc2548b4d26"}}
  :aliases
  {;; offline workspace dev -- pin transitive langchain to local checkout
   :dev {:override-deps

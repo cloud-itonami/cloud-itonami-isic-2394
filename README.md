@@ -59,10 +59,40 @@ the pattern ADR-2607142800 established, extending ADR-2607011000):
 executed quality-lab verification mission (`kotoba.robotics`
 mission/action/telemetry-proof contracts) -- automated cube-specimen
 sampling, a compressive-strength-test press, a Blaine-fineness scan --
-before `:actuation/ship-cement-batch` is proposable. The Kiln Governor
-independently re-derives the batch's own 28-day compressive-strength
-deviation from ground-truth fields, never trusting the mission's
-self-reported verdict alone.
+before `:actuation/ship-cement-batch` is proposable.
+
+**This is now a REAL engineering simulation, not a synthetic field
+comparison (ADR-2607152000, extending automotive's pilot
+ADR-2607151600 to this vertical).** This repository takes a REAL
+git-coordinate dependency on
+[`kotoba-lang/physics-2d`](https://github.com/kotoba-lang/physics-2d)
+(pinned by SHA in `deps.edn`), and `cementmill.robotics/simulate-
+quality-lab-cell` actually calls it: a real time-stepped rigid-body
+press-collision simulation -- a press-platen `Body2D` (the batch's own
+recorded `:press-platen-mass-kg` press-run configuration) closes at a
+disclosed controlled velocity onto a static (mass 0) ASTM C109/C109M
+50 mm cube-specimen `Body2D`, actually stepped tick-by-tick via
+`physics-2d/world-step`. Unlike automotive's pairing with a separate
+`kami-engine-vehicle-designer` design-library repo, this vertical has
+no design-library sibling -- the physics module lives directly inside
+`cementmill.robotics`, taking a real dependency on `physics-2d` alone
+(ADR-2607152000's own key simplification). The Kiln Governor
+independently re-derives the batch's own real simulated press telemetry
+(`:sim-peak-compressive-stress-mpa`) against the batch's OWN existing
+recorded 28-day compressive-strength acceptance band
+(`:strength-28d-min`/`:strength-28d-max` -- a real, already-established
+anchor, reused here, not a newly invented ceiling), never trusting the
+mission's self-reported verdict alone. Honest scope: the physics is a
+2D projection, the cube-specimen is treated as a static (mass 0)
+immovable anchor with no material-stiffness model at all (so the
+platen's own recorded press-run mass, not the specimen's real
+strength, is what varies the simulated reading), and the platen's
+closing velocity is a disclosed ANALOG rate (not a literal reproduction
+of EN 12390-3's/ASTM C39's mm/min-scale controlled-loading-rate
+conventions) -- see `cementmill.robotics`'s namespace docstring for the
+full, disclosed derivation. This real-engine wiring extends automotive's
+pilot to this vertical; the remaining cloud-itonami manufacturing
+actors are extended per ADR-2607152000's own fleet-extension plan.
 
 ## Core contract
 

@@ -47,9 +47,14 @@
                                        on the batch
                                        (`:robotics-sim-verified?`)? AND
                                        INDEPENDENTLY recompute whether
-                                       the batch's own recorded 28-day
-                                       compressive-strength reading
+                                       the batch's own recorded REAL
+                                       `physics-2d`-simulated press
+                                       telemetry
+                                       (`:sim-peak-compressive-stress-
+                                       mpa`, from `cementmill.robotics/
+                                       simulate-press`, ADR-2607152000)
                                        falls out of its own recorded
+                                       28-day compressive-strength
                                        acceptance-band bounds
                                        (`cementmill.robotics/
                                        simulation-out-of-tolerance?`),
@@ -169,8 +174,9 @@
   "For `:actuation/ship-cement-batch`: HARD hold if the robot quality-
   lab verification mission (`cementmill.robotics`) never ran and was
   recorded on the batch (`:robotics-sim-verified?`), OR if it did but
-  an INDEPENDENT recompute of the batch's own 28-day compressive-
-  strength fields (`cementmill.robotics/simulation-out-of-tolerance?`)
+  an INDEPENDENT recompute of the batch's own REAL `physics-2d`-
+  simulated press telemetry (`:sim-peak-compressive-stress-mpa`,
+  ADR-2607152000 -- `cementmill.robotics/simulation-out-of-tolerance?`)
   says out-of-tolerance right now -- never trusts the mission's own
   stored :passed? verdict alone, the same discipline `cement-batch-
   strength-out-of-range-violations` below uses."
@@ -184,8 +190,8 @@
 
         (robotics/simulation-out-of-tolerance? a)
         [{:rule :robotics-simulation-out-of-tolerance
-          :detail (str subject " の28日強度実測値("
-                       (:strength-28d-actual a) ")が独立再検証で許容範囲["
+          :detail (str subject " の実測圧縮強度シミュレーション値("
+                       (:sim-peak-compressive-stress-mpa a) "MPa)が独立再検証で許容範囲["
                        (:strength-28d-min a) "," (:strength-28d-max a) "]を逸脱")}]))))
 
 (defn- cement-batch-strength-out-of-range-violations

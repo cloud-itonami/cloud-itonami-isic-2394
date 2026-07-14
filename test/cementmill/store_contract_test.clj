@@ -6,6 +6,7 @@
   `automotive.store-contract-test` (`cloud-itonami-isic-2910`) for the
   same pattern on the sibling actor."
   (:require [clojure.test :refer [deftest is testing]]
+            [cementmill.robotics :as robotics]
             [cementmill.store :as store]))
 
 (defn- backends []
@@ -25,6 +26,21 @@
       (is (false? (:robotics-sim-verified? (store/cement-batch s "batch-1"))) "no robotics mission has run yet")
       (is (true? (:robotics-sim-verified? (store/cement-batch s "batch-5"))) "seeded as already-on-file")
       (is (= 65.0 (:strength-28d-actual (store/cement-batch s "batch-5"))))
+      (is (= 12.0 (:press-platen-mass-kg (store/cement-batch s "batch-1"))))
+      (is (number? (:sim-peak-compressive-stress-mpa (store/cement-batch s "batch-1")))
+          "real physics-2d press telemetry on file")
+      (is (<= (:strength-28d-min (store/cement-batch s "batch-1"))
+              (:sim-peak-compressive-stress-mpa (store/cement-batch s "batch-1"))
+              (:strength-28d-max (store/cement-batch s "batch-1")))
+          "batch-1's real simulated press reading clears its own real acceptance band")
+      (is (= 16.5 (:press-platen-mass-kg (store/cement-batch s "batch-5")))
+          "batch-5's press-run record uses a deliberately misconfigured (heavier) platen mass -- see cementmill.store/demo-data")
+      (is (> (:sim-peak-compressive-stress-mpa (store/cement-batch s "batch-5"))
+             (:strength-28d-max (store/cement-batch s "batch-5")))
+          "batch-5's real simulated press reading genuinely exceeds its own real acceptance band")
+      (is (= (:sim-peak-compressive-stress-mpa (store/cement-batch s "batch-5"))
+             (:sim-peak-compressive-stress-mpa (robotics/press-telemetry-for (store/cement-batch s "batch-5"))))
+          "the seeded telemetry is genuinely reproducible from the SAME press-telemetry-for call, never a hand-typed double")
       (is (false? (:batch-shipped? (store/cement-batch s "batch-1"))))
       (is (false? (:mill-certified? (store/cement-batch s "batch-1"))))
       (is (= ["batch-1" "batch-2" "batch-3" "batch-4" "batch-5"]
