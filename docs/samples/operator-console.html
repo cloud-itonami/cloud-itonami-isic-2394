@@ -1,0 +1,65 @@
+<html><head><meta charset="utf-8"><title>cloud-itonami-isic-2394 · cement mill</title><style>
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ok { color: #137a3f; }
+body { font-family: system-ui,-apple-system,sans-serif; margin: 0; color: #1a1a1a; background: #fafafa; }
+header.bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fff; border-bottom: 1px solid #e5e5e5; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+h2 { margin-top: 0; font-size: 15px; }
+.warn { color: #b25c00; background: #fff8e1; padding: 2px 6px; border-radius: 4px; }
+main { max-width: 980px; margin: 24px auto; padding: 0 20px; }
+header.bar h1 { font-size: 18px; margin: 0; font-weight: 600; }
+.muted { color: #888; font-size: 13px; }
+.critical { color: #fff; background: #b3261e; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.card { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.err { color: #b3261e; background: #fbe9e7; padding: 2px 6px; border-radius: 4px; }
+th { font-weight: 600; color: #555; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+header.bar .badge { margin-left: auto; font-size: 12px; color: #666; }
+code { font-size: 12px; background: #f4f4f4; padding: 1px 4px; border-radius: 3px; }
+</style></head><body>
+<header class="bar">
+  <h1>Cement mill (ISIC 2394) — Operator Console</h1>
+  <span class="badge">read-only sample · governor-gated · never dispatches hardware</span>
+</header>
+<main>
+  <section class="card">
+    <h2>Cement batches</h2>
+    <p class="muted">Demo snapshot — live data from <code>cementmill.store</code> / <code>clojure -M:dev:run</code>.</p>
+    <table>
+      <thead><tr><th>Batch</th><th>Name</th><th>Jurisdiction</th><th>28-day strength</th><th>Kiln emissions</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>batch-1</td><td>Ordinary Portland Cement Batch OPC-42.5N-104</td><td>JPN</td><td class="ok">47.0 ∈ [42.5,62.5] MPa</td><td class="ok">resolved</td><td class="ok">ready</td></tr>
+        <tr><td>batch-2</td><td>Ordinary Portland Cement Batch OPC-42.5N-207</td><td>ATL</td><td class="ok">in-spec</td><td class="ok">—</td><td><span class="err">no spec-basis</span></td></tr>
+        <tr><td>batch-3</td><td>普通ポルトランドセメント バッチ OPC-42.5N-311</td><td>JPN</td><td><span class="err">30.0 out of range</span></td><td class="ok">—</td><td><span class="warn">HARD hold on shipment</span></td></tr>
+        <tr><td>batch-4</td><td>早強ポルトランドセメント バッチ RPC-52.5R-412</td><td>JPN</td><td class="ok">in-spec</td><td><span class="err">unresolved</span></td><td><span class="critical">kiln-emissions hold</span></td></tr>
+        <tr><td>batch-5</td><td>高炉セメントB種 バッチ BFS-B-509</td><td>JPN</td><td><span class="err">65.0 out of range</span></td><td class="ok">—</td><td><span class="warn">HARD hold on independent recheck</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="card">
+    <h2>Action gate (Kiln Governor)</h2>
+    <p class="muted">HARD holds cannot be overridden. Actuation always escalates to a human quality-control engineer.</p>
+    <table>
+      <thead><tr><th>Op</th><th>Stake</th><th>Gate</th></tr></thead>
+      <tbody>
+        <tr><td><code>:cement-batch/intake</code></td><td>none</td><td><span class="ok">phase-3 auto when clean</span></td></tr>
+        <tr><td><code>:quality-standard/verify</code></td><td>none</td><td><span class="warn">human approval · no fabricated quality-standard rules</span></td></tr>
+        <tr><td><code>:kiln-emissions/screen</code></td><td>none</td><td><span class="critical">HARD hold if unresolved out-of-limit finding</span></td></tr>
+        <tr><td><code>:robotics/simulate-quality-lab-cell</code></td><td>none</td><td><span class="warn">human approval · required on file before shipment</span></td></tr>
+        <tr><td><code>:actuation/ship-cement-batch</code></td><td class="critical">safety-critical</td><td><span class="warn">always human · robotics + strength checks</span></td></tr>
+        <tr><td><code>:actuation/issue-mill-certificate</code></td><td class="critical">safety-critical</td><td><span class="warn">always human · kiln-emissions + double-issue guard</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="card">
+    <h2>Social hand-off</h2>
+    <p class="muted">Audit package for quality-standard inspectors / market-regulator inspectors — <code>cementmill.export/audit-package</code> and <code>package-&gt;csv-bundle</code> (cement-batches / ledger / shipments / mill-certificates CSV).</p>
+    <table>
+      <thead><tr><th>Artifact</th><th>Kind</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>JPN-SHP-000000</td><td>cement-batch-shipment-draft</td><td>unsigned · mill signs offline</td></tr>
+        <tr><td>JPN-MTC-000000</td><td>mill-certificate-draft</td><td>unsigned · quality-standard-body submission is mill act</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body></html>
