@@ -113,8 +113,82 @@
     body) -- so `:press-platen-mass-kg` is what actually moves
     `:sim-peak-compressive-force-n`/`:sim-peak-compressive-stress-mpa`
     here (via F = m*a), never the closing velocity or crush-travel
-    (both fixed constants, shared by every batch)."
-  (:require [kotoba.robotics :as robotics]
+    (both fixed constants, shared by every batch).
+
+  ADR-2607996500 EXTENDS this ns with a real CAD/BREP bridge, closing
+  the gap this ns's docstring used to disclose ('this ns has no CAD/
+  BREP pipeline'): the STATIC `:cube-specimen` body's AABB half-extents
+  are now genuinely derived from `cementmill.cad/envelope-dims-mm`'s
+  tessellated cube-specimen envelope dims for THIS batch (see
+  `specimen-half-extents-m` below), instead of being bare fixed
+  constants derived from `specimen-side-mm` alone.
+
+  HONEST, VERIFIED DIVERGENCE FROM BOTH PRIOR PORTS (isic-2930's
+  `autoparts.cad`/`autoparts.robotics`, isic-2610's `fab.cad`/`fab.
+  simphysics`) -- see `cementmill.cad`'s own docstring for the full
+  disclosure, summarized here because it changes which BODY below
+  reads CAD dims: in both prior verticals, the CAD envelope sizes the
+  MOVING body (the jaw/the anchor) and the STATIC body stays fixed.
+  THIS vertical is the reverse, verified directly from the `p2d/make-
+  body` calls below, not assumed from either prior shape: `:press-
+  platen` is the MOVING body (real velocity, real batch-recorded
+  mass); `:cube-specimen` is the STATIC (mass 0, immovable) body. The
+  body `cementmill.cad` genuinely, literally models (a real ASTM
+  C109/C109M 50 mm cube) is the STATIC specimen here, so THIS ns
+  derives the STATIC `:cube-specimen`'s AABB from CAD and leaves the
+  MOVING `:press-platen`'s AABB (`platen-half-w-m`/`platen-half-h-m`)
+  FIXED -- the mirror image of the prior two ports' moving/static
+  split, for the same underlying 'only derive the body CAD actually
+  models' principle both of those ports' docstrings already state.
+
+  GEOMETRY-INVARIANCE, verified and disclosed (checked ALGEBRAICALLY
+  AND WITH A TEST -- per ADR-2607996500, do not assume this vertical's
+  physics/geometry coupling matches either prior port without
+  checking): `platen-x`/`approach-m`/`contact-plane-x` below are all
+  constructed so the FACE-TO-FACE gap the platen must close (from its
+  own leading face at start to the specimen's near face) is ALWAYS
+  exactly `gap-m`, regardless of `half-w`/`half-h` (both cancel out of
+  the placement algebra by construction, the SAME technique
+  `autoparts.robotics`'s `jaw-x0`/`limit-boundary-x` and `fab.
+  simphysics`'s `wall-x` use). Consequently
+  `:sim-peak-compressive-force-n`/`:sim-peak-compressive-stress-mpa`/
+  `:sim-peak-crush-distance-m` are IDENTICAL whether `batch` carries a
+  real `:specimen-side-mm` or falls back to the default -- VERIFIED,
+  not merely algebraic, in `robotics_test.clj`.
+
+  A REAL, VERIFIED DIVERGENCE from BOTH prior ports on `:ticks`
+  (disclosed, not smoothed over -- exactly the kind of finding a naive
+  'this vertical works just like the last one' port would have
+  missed): in `autoparts.robotics`/`fab.simphysics`, the tick-COUNT
+  formula (`approach-m`/`ticks` there) is constructed WITHOUT any
+  half-w term at all, so `:ticks` is itself geometry-invariant. THIS
+  ns's pre-existing (pre-ADR-2607996500, unchanged by it) `approach-m`
+  = `gap-m + platen-half-w-m + half-w` is the distance from the
+  platen's start position to the specimen's CENTER (a generous, already
+  over-conservative safety margin ensuring the platen actually reaches
+  and passes contact before `settle-ticks` are appended), NOT the
+  actual `gap-m` travel-to-contact distance -- so it DOES include
+  `half-w`, and `:ticks` DOES genuinely grow with a larger CAD-derived
+  specimen (verified in `robotics_test.clj`). This does NOT affect
+  `:sim-peak-compressive-force-n`/`:sim-peak-compressive-stress-mpa`/
+  `:sim-peak-crush-distance-m` (the actual collision-triggering tick is
+  governed purely by `gap-m`/`v0`/`dt`, all fixed constants, so the
+  extra/fewer trailing ticks are all already-settled, ~zero-velocity
+  samples appended after the real peak) -- but it is a genuinely
+  different disclosed property than either prior port's `:ticks`
+  invariance, not an assumed-identical one.
+
+  `:trajectory`'s absolute `:position` values also genuinely shift with
+  `batch`'s own real specimen geometry (`platen-x`'s formula includes
+  `half-w`) -- matching `autoparts.robotics`'s finding (CAD geometry
+  visibly moves the trajectory), NOT `fab.simphysics`'s (where the
+  moving body starts at a fixed coordinate origin unrelated to CAD
+  dims) -- because here, unlike `fab.simphysics`, the MOVING body's own
+  start position is placed relative to the CAD-derived STATIC body,
+  mirroring how `autoparts.robotics`'s moving jaw is placed flush
+  against ITS OWN static body."
+  (:require [cementmill.cad :as cad]
+            [kotoba.robotics :as robotics]
             [physics-2d :as p2d]))
 
 ;; ───────────────────── real, cited physical constants ─────────────────────
@@ -187,12 +261,21 @@
 
 (def ^:const specimen-half-w-m
   "Cube-specimen AABB half-width (m) along the travel axis -- the real
-  50 mm cube's own half-depth."
+  50 mm cube's own half-depth. ADR-2607996500: no longer read directly
+  by `simulate-press` (superseded by `cementmill.cad`-derived per-batch
+  dims, see `specimen-half-extents-m` below), retained as a disclosed
+  reference figure -- `cementmill.cad/default-specimen-side-mm` is
+  DELIBERATELY defined to reproduce this exact half-width (50 mm full
+  side / 2 = 0.025 m) when a batch carries no real `:specimen-side-mm`,
+  so a batch with nothing on file gets the SAME cube-specimen AABB size
+  this ns used before this ADR."
   (/ (/ specimen-side-mm 1000.0) 2.0))
 
 (def ^:const specimen-half-h-m
   "Cube-specimen AABB half-height (m), lateral -- the real 50 mm cube's
-  own half-width (a cube is square in cross-section)."
+  own half-width (a cube is square in cross-section). See
+  `specimen-half-w-m`'s own ADR-2607996500 note -- identical reasoning,
+  both halves of a cube's square cross-section are always equal."
   specimen-half-w-m)
 
 (def ^:const gap-m
@@ -213,6 +296,47 @@
 
 ;; ───────────────────── real physics-2d press simulation ─────────────────────
 
+(defn- as-batch-map
+  "Normalizes `simulate-press`'s first argument: a bare number is a
+  legacy/no-CAD-geometry caller and is treated as `{:press-platen-mass-
+  kg n}` (so `cementmill.cad/envelope-dims-mm` falls back to its
+  disclosed ASTM-nominal default, below); a map (a real cement-batch
+  record, optionally carrying `:specimen-side-mm`) is passed through
+  unchanged. Direct port of `autoparts.robotics/as-part-lot-map`."
+  [batch-or-mass]
+  (if (map? batch-or-mass) batch-or-mass {:press-platen-mass-kg batch-or-mass}))
+
+(defn- specimen-half-extents-m
+  "AABB half-extents (m) for the STATIC `:cube-specimen` body, from
+  `cementmill.cad/envelope-dims-mm`'s REAL tessellated dims (mm) for
+  `batch` -- travel-axis half-width = length/2, lateral half-height =
+  width/2 (always equal here -- a cube, see `cementmill.cad`'s own
+  docstring for why this ns exposes a single `:specimen-side-mm` field
+  rather than an independent length/width/height triple). Direct port
+  of `autoparts.robotics/specimen-half-extents-m`'s (and, before it,
+  `vdesign.simphysics/vehicle-half-extents-m`'s) length/width-only
+  reading of the CAD envelope, applied here to the STATIC body instead
+  of the moving one -- see this ns's own docstring's GEOMETRY-
+  INVARIANCE section for why that reversal is the honest choice for
+  THIS vertical. `envelope-dims-mm` always returns SOME dims (a
+  batch's own real `:specimen-side-mm` when present, `cementmill.cad`'s
+  disclosed ASTM-nominal default when absent), so this always
+  succeeds; it is the INPUT (whether `batch` carries a real measured
+  dimension) that varies, not this function's availability. PRIVATE
+  (mirrors `autoparts.robotics`'s own private choice, not `fab.
+  simphysics`'s public one): here, like in `autoparts.robotics` and
+  unlike `fab.simphysics`, CAD-derived geometry IS genuinely visible
+  directly in `simulate-press`'s own returned `:trajectory` (see this
+  ns's docstring), so a test/caller does not need direct access to this
+  fn to confirm CAD dims are wired in -- `simulate-press`'s own
+  returned `:specimen-half-extents-m` key (below) is the direct,
+  public way to do that, mirroring `fab.simphysics/simulate`'s own
+  disclosed convenience without needing to make this fn itself public."
+  [batch]
+  (let [{:keys [length-mm width-mm]} (cad/envelope-dims-mm batch)]
+    {:half-w (/ length-mm 2000.0)
+     :half-h (/ width-mm 2000.0)}))
+
 (defn simulate-press
   "Time-steps a REAL `physics-2d` world for ONE compressive-strength-
   press-test cycle: a press-platen `Body2D` (mass `platen-mass-kg`,
@@ -222,7 +346,18 @@
   `Body2D`. Returns {:trajectory [{:tick :position :velocity} ...]
   (platen body only) :sim-peak-compressive-force-n n
   :sim-peak-compressive-stress-mpa n :sim-peak-crush-distance-m n
-  :ticks n :dt n :closing-velocity-mps n}.
+  :ticks n :dt n :closing-velocity-mps n
+  :specimen-half-extents-m {:half-w n :half-h n}}.
+
+  `batch-or-mass` is EITHER the batch's own recorded press-run
+  configuration mass (a bare number -- legacy/no-CAD-geometry callers)
+  OR the full cement-batch map (with `:press-platen-mass-kg` and,
+  optionally, a real `:specimen-side-mm` measured cube-envelope
+  dimension -- ADR-2607996500). Either way the STATIC `:cube-specimen`
+  body's AABB is sized via `specimen-half-extents-m` (`cementmill.cad`-
+  derived, real-or-disclosed-default); the MOVING `:press-platen`'s
+  AABB always uses its own fixed `platen-half-w-m`/`platen-half-h-m`
+  constants (see those defs' docstrings for why).
 
   `:sim-peak-compressive-force-n` is `platen-mass-kg` times the PEAK
   magnitude of tick-to-tick velocity change (along the travel axis)
@@ -230,24 +365,43 @@
   velocity trajectory (the SAME technique `vdesign.simphysics` uses for
   `:sim-decel-g`, extended one step further into a force via the
   platen's own recorded mass). `:sim-peak-compressive-stress-mpa`
-  divides that force by the cube's own real face area (mm^2) -- 1 MPa =
-  1 N/mm^2 -- so it is directly comparable to a batch's own recorded
-  :strength-28d-min/:strength-28d-max (both MPa).
-  `:sim-peak-crush-distance-m` is the largest AABB penetration depth
-  (m) actually observed between the platen's leading face and the
-  specimen's near face across the whole trajectory -- informational
+  divides that force by the cube's own FIXED, ASTM-nominal real face
+  area (mm^2, `specimen-face-area-mm2` -- deliberately NOT this batch's
+  own CAD-derived area, see `cementmill.cad`'s docstring's disclosed
+  scope boundary) -- 1 MPa = 1 N/mm^2 -- so it is directly comparable
+  to a batch's own recorded :strength-28d-min/:strength-28d-max (both
+  MPa). `:sim-peak-crush-distance-m` is the largest AABB penetration
+  depth (m) actually observed between the platen's leading face and
+  the specimen's near face across the whole trajectory -- informational
   (this ns's tolerance check uses the force/stress reading, not
   displacement), derived from the actual simulated positions, not
-  invented.
+  invented. `:specimen-half-extents-m` is the REAL half-extents this
+  run actually used, so a caller/test can always confirm CAD geometry
+  is genuinely being read (mirrors `fab.simphysics/simulate`'s own
+  disclosed `:anchor-half-extents-m` convenience).
 
-  Pure, deterministic -- the same `platen-mass-kg` always reproduces
+  GEOMETRY-INVARIANCE and the real, verified `:ticks`/`:trajectory`
+  divergence from both prior digital-twin ports are disclosed in full
+  in this ns's own docstring -- see there before assuming this
+  vertical's geometry/physics coupling matches either prior port.
+
+  Pure, deterministic -- the same `batch-or-mass` always reproduces
   the same telemetry; no IO, no wall-clock."
-  [platen-mass-kg]
-  (let [v0 press-closing-velocity-mps
-        approach-m (+ gap-m platen-half-w-m specimen-half-w-m)
+  [batch-or-mass]
+  (let [batch (as-batch-map batch-or-mass)
+        platen-mass-kg (double (:press-platen-mass-kg batch))
+        v0 press-closing-velocity-mps
+        {:keys [half-w half-h] :as half-extents} (specimen-half-extents-m batch)
+        approach-m (+ gap-m platen-half-w-m half-w)
         ticks (long (+ settle-ticks (long (Math/ceil (/ approach-m (* v0 dt))))))
         specimen-x 0.0
-        platen-x (- specimen-x specimen-half-w-m platen-half-w-m gap-m)
+        ;; platen-x/contact-plane-x are both offset by half-w (and
+        ;; platen-x additionally by platen-half-w-m) so the face-to-
+        ;; face gap the platen must close is ALWAYS exactly gap-m,
+        ;; regardless of half-w -- see ns docstring's GEOMETRY-
+        ;; INVARIANCE section (same technique autoparts.robotics's
+        ;; jaw-x0/limit-boundary-x and fab.simphysics's wall-x use).
+        platen-x (- specimen-x half-w platen-half-w-m gap-m)
         platen (p2d/make-body {:position [platen-x 0.0]
                                 :velocity [v0 0.0]
                                 :mass platen-mass-kg
@@ -260,7 +414,7 @@
                                   :mass 0.0
                                   :restitution 0.0
                                   :friction 0.0
-                                  :collider (p2d/make-aabb-collider specimen-half-w-m specimen-half-h-m)
+                                  :collider (p2d/make-aabb-collider half-w half-h)
                                   :user-data :cube-specimen})
         w0 (p2d/world-new [0.0 0.0])
         [w1 pid] (p2d/world-add w0 platen)
@@ -273,7 +427,7 @@
         vxs (mapv (comp first :velocity) trajectory)
         peak-decel-mps2 (->> (map (fn [va vb] (Math/abs (/ (- vb va) dt))) vxs (rest vxs))
                               (reduce max 0.0))
-        contact-plane-x (- specimen-x specimen-half-w-m)
+        contact-plane-x (- specimen-x half-w)
         penetrations-m (mapv (fn [{:keys [position]}]
                                 (max 0.0 (- (+ (first position) platen-half-w-m) contact-plane-x)))
                               trajectory)
@@ -284,18 +438,28 @@
      :sim-peak-crush-distance-m (reduce max 0.0 penetrations-m)
      :ticks (count trajectory)
      :dt dt
-     :closing-velocity-mps v0}))
+     :closing-velocity-mps v0
+     :specimen-half-extents-m half-extents}))
 
 (defn press-telemetry-for
   "Runs the REAL `simulate-press` time-stepped `physics-2d` simulation
   for `batch`'s own recorded `:press-platen-mass-kg` press-run
-  configuration and returns the actual simulated telemetry:
-  {:sim-peak-compressive-force-n n :sim-peak-compressive-stress-mpa n
-  :sim-peak-crush-distance-m n :ticks n :dt n :closing-velocity-mps n}.
-  Pure, deterministic -- no IO; the same `:press-platen-mass-kg` always
-  reproduces the same telemetry."
+  configuration, plus, when present, its own real `:specimen-side-mm`
+  measured cube-envelope dimension (ADR-2607996500 -- `simulate-press`'s
+  `batch-or-mass` accepts the full map), and returns the actual
+  simulated telemetry: {:sim-peak-compressive-force-n n
+  :sim-peak-compressive-stress-mpa n :sim-peak-crush-distance-m n
+  :ticks n :dt n :closing-velocity-mps n
+  :specimen-half-extents-m {:half-w n :half-h n}}. Pure, deterministic
+  -- no IO; the same `batch` always reproduces the same telemetry. Per
+  `simulate-press`'s disclosed geometry-invariance,
+  `:sim-peak-compressive-force-n`/`:sim-peak-compressive-stress-mpa`/
+  `:sim-peak-crush-distance-m` themselves are driven by
+  `:press-platen-mass-kg` (and the fixed closing-velocity/crush-travel
+  constants), NOT by the cube-specimen envelope's size -- see that fn's
+  docstring."
   [batch]
-  (simulate-press (:press-platen-mass-kg batch)))
+  (simulate-press batch))
 
 (def mission-actions
   "The three-step quality-lab verification mission every cement batch
