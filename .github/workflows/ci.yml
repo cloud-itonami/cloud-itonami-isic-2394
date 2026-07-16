@@ -4,8 +4,13 @@ name: ci
 # Until then: run locally with `clojure -M:lint` and `clojure -M:dev:test`.
 #
 # Workspace layout: deps use :local/root to kotoba-lang/langgraph,
-# kotoba-lang/robotics and kotoba-lang/langchain (public). CI reconstructs
-# sibling paths.
+# kotoba-lang/langchain and kotoba-lang/robotics (all public; robotics
+# itself further :local/root's to kotoba-lang/html and kotoba-lang/css
+# as siblings). CI reconstructs sibling paths for the :local/root deps
+# (including robotics's own transitive :local/root deps -- html/css must
+# also be checked out here, not just where robotics's OWN deps.edn would
+# resolve them, since GitHub Actions checkout does not follow local/root
+# chains).
 
 on:
   push:
@@ -38,6 +43,14 @@ jobs:
         with:
           repository: kotoba-lang/robotics
           path: orgs/kotoba-lang/robotics
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/html
+          path: orgs/kotoba-lang/html
+      - uses: actions/checkout@v4
+        with:
+          repository: kotoba-lang/css
+          path: orgs/kotoba-lang/css
       - uses: actions/checkout@v4
         with:
           repository: kotoba-lang/langchain
