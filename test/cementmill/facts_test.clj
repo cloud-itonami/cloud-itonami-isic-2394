@@ -21,5 +21,9 @@
     (is (not (facts/required-evidence-satisfied? "JPN" (rest all))))
     (is (not (facts/required-evidence-satisfied? "ATL" all)) "no spec-basis -> never satisfied")))
 
-(deftest four-jurisdictions-seeded-honestly
-  (is (= #{"JPN" "USA" "GBR" "DEU"} (set (keys facts/catalog)))))
+(deftest five-jurisdictions-seeded-honestly
+  (is (= #{"JPN" "USA" "GBR" "DEU" "BRA"} (set (keys facts/catalog)))))
+
+(deftest bra-has-a-spec-basis
+  (is (some? (facts/spec-basis "BRA")))
+  (is (string? (:provenance (facts/spec-basis "BRA")))))
