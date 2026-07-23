@@ -33,11 +33,10 @@
   immutable log -- the audit trail a community trusting a cement mill
   needs, and the evidence a mill needs if a shipment or certificate
   decision is later disputed."
-  (:require #?(:clj  [clojure.edn :as edn]
-               :cljs [cljs.reader :as edn])
-            [cementmill.registry :as registry]
+  (:require [cementmill.registry :as registry]
             [cementmill.robotics :as robotics]
-            [langchain.db :as d]))
+            [langchain.db :as d]
+            [langchain-store.core :as ls]))
 
 (defprotocol Store
   (cement-batch [s id])
@@ -239,9 +238,6 @@
    :shipment-sequence/jurisdiction    {:db/unique :db.unique/identity}
    :certificate-sequence/jurisdiction {:db/unique :db.unique/identity}})
 
-(defn- enc [v] (pr-str v))
-(defn- dec* [s] (when s (edn/read-string s)))
-
 (defn- batch->tx [{:keys [id batch-name strength-28d-actual strength-28d-min strength-28d-max
                            press-platen-mass-kg sim-peak-compressive-force-n sim-peak-compressive-stress-mpa
                            kiln-emissions-unresolved? robotics-sim-verified? robotics-sim-record
@@ -257,7 +253,7 @@
     (some? sim-peak-compressive-stress-mpa)     (assoc :batch/sim-peak-compressive-stress-mpa sim-peak-compressive-stress-mpa)
     (some? kiln-emissions-unresolved?)         (assoc :batch/kiln-emissions-unresolved? kiln-emissions-unresolved?)
     (some? robotics-sim-verified?)              (assoc :batch/robotics-sim-verified? robotics-sim-verified?)
-    (some? robotics-sim-record)                 (assoc :batch/robotics-sim-record (enc robotics-sim-record))
+    (some? robotics-sim-record)                 (assoc :batch/robotics-sim-record (ls/enc robotics-sim-record))
     (some? batch-shipped?)                     (assoc :batch/batch-shipped? batch-shipped?)
     (some? mill-certified?)                    (assoc :batch/mill-certified? mill-certified?)
     jurisdiction                               (assoc :batch/jurisdiction jurisdiction)
@@ -284,7 +280,7 @@
      :sim-peak-compressive-stress-mpa (:batch/sim-peak-compressive-stress-mpa m)
      :kiln-emissions-unresolved? (boolean (:batch/kiln-emissions-unresolved? m))
      :robotics-sim-verified? (boolean (:batch/robotics-sim-verified? m))
-     :robotics-sim-record (dec* (:batch/robotics-sim-record m))
+     :robotics-sim-record (ls/dec* (:batch/robotics-sim-record m))
      :batch-shipped? (boolean (:batch/batch-shipped? m))
      :mill-certified? (boolean (:batch/mill-certified? m))
      :jurisdiction (:batch/jurisdiction m) :status (:batch/status m)
@@ -299,25 +295,25 @@
          (map #(pull->batch (d/pull (d/db conn) batch-pull [:batch/id %])))
          (sort-by :id)))
   (kiln-emissions-screen-of [_ id]
-    (dec* (d/q '[:find ?p . :in $ ?aid
+    (ls/dec* (d/q '[:find ?p . :in $ ?aid
                 :where [?k :kiln-emissions-screen/batch-id ?aid] [?k :kiln-emissions-screen/payload ?p]]
               (d/db conn) id)))
   (quality-standard-verification-of [_ batch-id]
-    (dec* (d/q '[:find ?p . :in $ ?aid
+    (ls/dec* (d/q '[:find ?p . :in $ ?aid
                 :where [?a :verification/batch-id ?aid] [?a :verification/payload ?p]]
               (d/db conn) batch-id)))
   (ledger [_]
     (->> (d/q '[:find ?s ?f :where [?e :ledger/seq ?s] [?e :ledger/fact ?f]] (d/db conn))
          (sort-by first)
-         (mapv (comp dec* second))))
+         (mapv (comp ls/dec* second))))
   (shipment-history [_]
     (->> (d/q '[:find ?s ?r :where [?e :shipment/seq ?s] [?e :shipment/record ?r]] (d/db conn))
          (sort-by first)
-         (mapv (comp dec* second))))
+         (mapv (comp ls/dec* second))))
   (certificate-history [_]
     (->> (d/q '[:find ?s ?r :where [?e :certificate/seq ?s] [?e :certificate/record ?r]] (d/db conn))
          (sort-by first)
-         (mapv (comp dec* second))))
+         (mapv (comp ls/dec* second))))
   (next-shipment-sequence [_ jurisdiction]
     (or (d/q '[:find ?n . :in $ ?j
               :where [?e :shipment-sequence/jurisdiction ?j] [?e :shipment-sequence/next ?n]]
@@ -338,10 +334,10 @@
       (d/transact! conn [(batch->tx value)])
 
       :verification/set
-      (d/transact! conn [{:verification/batch-id (first path) :verification/payload (enc payload)}])
+      (d/transact! conn [{:verification/batch-id (first path) :verification/payload (ls/enc payload)}])
 
       :kiln-emissions-screen/set
-      (d/transact! conn [{:kiln-emissions-screen/batch-id (first path) :kiln-emissions-screen/payload (enc payload)}])
+      (d/transact! conn [{:kiln-emissions-screen/batch-id (first path) :kiln-emissions-screen/payload (ls/enc payload)}])
 
       :cement-batch/mark-shipped
       (let [batch-id (first path)
@@ -351,7 +347,7 @@
         (d/transact! conn
                      [(batch->tx (assoc batch-patch :id batch-id))
                       {:shipment-sequence/jurisdiction jurisdiction :shipment-sequence/next next-n}
-                      {:shipment/seq (count (shipment-history s)) :shipment/record (enc (get result "record"))}])
+                      {:shipment/seq (count (shipment-history s)) :shipment/record (ls/enc (get result "record"))}])
         result)
 
       :cement-batch/mark-certified
@@ -362,12 +358,12 @@
         (d/transact! conn
                      [(batch->tx (assoc batch-patch :id batch-id))
                       {:certificate-sequence/jurisdiction jurisdiction :certificate-sequence/next next-n}
-                      {:certificate/seq (count (certificate-history s)) :certificate/record (enc (get result "record"))}])
+                      {:certificate/seq (count (certificate-history s)) :certificate/record (ls/enc (get result "record"))}])
         result)
       nil)
     s)
   (append-ledger! [s fact]
-    (d/transact! conn [{:ledger/seq (count (ledger s)) :ledger/fact (enc fact)}])
+    (d/transact! conn [{:ledger/seq (count (ledger s)) :ledger/fact (ls/enc fact)}])
     fact)
   (with-cement-batches [s batches]
     (when (seq batches) (d/transact! conn (mapv batch->tx (vals batches)))) s))
