@@ -231,6 +231,52 @@
           (esc (get record "record_id")) (esc (get record "kind"))
           (esc (get record "batch_id")) (esc (get record "jurisdiction"))))
 
+(defn- approver-cell
+  "Renders WHO approved, read straight off the committed SSoT record --
+  never off the proposal, and never guessed. Absent means absent."
+  [v]
+  (if (some? v)
+    (format "<code>%s</code>" (esc v))
+    "<span class=\"muted\">not on the record</span>"))
+
+(defn- approver-rows
+  "Approver attribution as the SSoT actually holds it, per committed
+  record family.
+
+  `cementmill.operation`'s `:request-approval` node attaches the human
+  approver under the record's `:payload` key. `store/commit-record!`
+  applies `:payload` for `:verification/set` and
+  `:kiln-emissions-screen/set`, so for those two the approver really
+  does land on the SSoT. The two actuation effects
+  (`:cement-batch/mark-shipped`, `:cement-batch/mark-certified`)
+  rebuild their record from `cementmill.registry` and never read
+  `:payload`, so the shipment / Mill-Test-Certificate drafts genuinely
+  carry no approver field at all. This table reports that gap instead
+  of papering over it -- an operator reading the console must not be
+  led to believe the mill's book-of-record knows who authorised a
+  shipment when it does not.
+
+  Deterministic: batches come back `sort-by :id`, both draft histories
+  are append-only vectors."
+  [db]
+  (concat
+   (for [b (store/all-cement-batches db)
+         :let [v (store/quality-standard-verification-of db (:id b))]
+         :when v]
+     (format "        <tr><td>quality-standard verification &middot; <code>%s</code></td><td><code>:verification/set</code></td><td>%s</td></tr>"
+             (esc (:id b)) (approver-cell (:approved-by v))))
+   (for [b (store/all-cement-batches db)
+         :let [k (store/kiln-emissions-screen-of db (:id b))]
+         :when k]
+     (format "        <tr><td>kiln-emissions screening &middot; <code>%s</code></td><td><code>:kiln-emissions-screen/set</code></td><td>%s</td></tr>"
+             (esc (:id b)) (approver-cell (:approved-by k))))
+   (for [r (store/shipment-history db)]
+     (format "        <tr><td>cement-batch shipment draft &middot; <code>%s</code></td><td><code>:cement-batch/mark-shipped</code></td><td>%s</td></tr>"
+             (esc (get r "record_id")) (approver-cell (get r "approved_by"))))
+   (for [r (store/certificate-history db)]
+     (format "        <tr><td>Mill-Test-Certificate draft &middot; <code>%s</code></td><td><code>:cement-batch/mark-certified</code></td><td>%s</td></tr>"
+             (esc (get r "record_id")) (approver-cell (get r "approved_by"))))))
+
 (def ^:private action-gate-rows
   ;; Static description of this actor's own closed op contract (README
   ;; `Ops`, `cementmill.governor`/`cementmill.phase`) -- documentation of
@@ -306,6 +352,17 @@
      "      <thead><tr><th>Record</th><th>Kind</th><th>Batch</th><th>Jurisdiction</th></tr></thead>\n"
      "      <tbody>\n"
      (str/join "\n" (map draft-row drafts)) "\n"
+     "      </tbody>\n"
+     "    </table>\n"
+     "  </section>\n"
+
+     "  <section class=\"card\">\n"
+     "    <h2>Approver attribution actually held by the SSoT</h2>\n"
+     "    <p class=\"muted\">Every row below is read back out of the committed record, not out of the proposal. <code>cementmill.operation</code>'s <code>:request-approval</code> node attaches the approver under the record's <code>:payload</code> key; <code>cementmill.store/commit-record!</code> applies <code>:payload</code> for <code>:verification/set</code> and <code>:kiln-emissions-screen/set</code>, so those keep it. The two actuation effects rebuild their record from <code>cementmill.registry</code> and never read <code>:payload</code>, so the shipment and Mill-Test-Certificate drafts carry <strong>no approver field at all</strong> — stated here as absent rather than filled in from the run. A mill reconciling who authorised a shipment cannot get that answer from this book-of-record today.</p>\n"
+     "    <table>\n"
+     "      <thead><tr><th>Committed record</th><th>Store effect applied</th><th>Approver on the record</th></tr></thead>\n"
+     "      <tbody>\n"
+     (str/join "\n" (approver-rows db)) "\n"
      "      </tbody>\n"
      "    </table>\n"
      "  </section>\n"

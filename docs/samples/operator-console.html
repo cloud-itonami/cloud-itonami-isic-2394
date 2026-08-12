@@ -2533,5 +2533,20 @@ img,svg { max-width: 100%; height: auto; }
       </tbody>
     </table>
   </section>
+  <section class="card">
+    <h2>Approver attribution actually held by the SSoT</h2>
+    <p class="muted">Every row below is read back out of the committed record, not out of the proposal. <code>cementmill.operation</code>'s <code>:request-approval</code> node attaches the approver under the record's <code>:payload</code> key; <code>cementmill.store/commit-record!</code> applies <code>:payload</code> for <code>:verification/set</code> and <code>:kiln-emissions-screen/set</code>, so those keep it. The two actuation effects rebuild their record from <code>cementmill.registry</code> and never read <code>:payload</code>, so the shipment and Mill-Test-Certificate drafts carry <strong>no approver field at all</strong> — stated here as absent rather than filled in from the run. A mill reconciling who authorised a shipment cannot get that answer from this book-of-record today.</p>
+    <table>
+      <thead><tr><th>Committed record</th><th>Store effect applied</th><th>Approver on the record</th></tr></thead>
+      <tbody>
+        <tr><td>quality-standard verification &middot; <code>batch-1</code></td><td><code>:verification/set</code></td><td><code>op-1</code></td></tr>
+        <tr><td>quality-standard verification &middot; <code>batch-3</code></td><td><code>:verification/set</code></td><td><code>op-1</code></td></tr>
+        <tr><td>quality-standard verification &middot; <code>batch-5</code></td><td><code>:verification/set</code></td><td><code>op-1</code></td></tr>
+        <tr><td>kiln-emissions screening &middot; <code>batch-1</code></td><td><code>:kiln-emissions-screen/set</code></td><td><code>op-1</code></td></tr>
+        <tr><td>cement-batch shipment draft &middot; <code>JPN-SHP-000000</code></td><td><code>:cement-batch/mark-shipped</code></td><td><span class="muted">not on the record</span></td></tr>
+        <tr><td>Mill-Test-Certificate draft &middot; <code>JPN-MTC-000000</code></td><td><code>:cement-batch/mark-certified</code></td><td><span class="muted">not on the record</span></td></tr>
+      </tbody>
+    </table>
+  </section>
 </main>
 </body></html>
