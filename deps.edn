@@ -6,7 +6,15 @@
  ;; repo is standalone (forkable outside the workspace); the :local/root
  ;; paths only resolve inside the monorepo checkout — a standalone fork
  ;; should override them with git coordinates.
- :deps {io.github.kotoba-lang/langgraph
+ :deps {;; デジタル庁デザインシステム (DADS) -- the workspace's BASE design
+        ;; system. `jp-go-dds.skin/dds+skin` supplies the whole stylesheet
+        ;; for the build-time-generated operator console below, so the
+        ;; sample page tracks the shared design system instead of carrying
+        ;; its own hand-written CSS.
+        io.github.kotoba-lang/jp-go-digital-design-system
+        {:git/url "https://github.com/kotoba-lang/jp-go-digital-design-system"
+         :git/sha "83db99546eabc53613ae826ea41d1533a3c574af"}
+        io.github.kotoba-lang/langgraph
         {:local/root "../../kotoba-lang/langgraph"}
         io.github.kotoba-lang/langchain-store
         {:local/root "../../kotoba-lang/langchain-store"}
@@ -54,6 +62,11 @@
          {:local/root "../../kotoba-lang/langchain"}}}
   ;; clojure -M:dev:run  -> drive the demo through one OperationActor
   :run {:main-opts ["-m" "cementmill.sim"]}
+  ;; clojure -M:dev:render-html [out-file] -> regenerate
+  ;; docs/samples/operator-console.html through the REAL actor stack
+  ;; (flagship checklist item 2, ADR-2607189300). Refuses to write a page
+  ;; whose ledger carries no HARD governor hold.
+  :render-html {:main-opts ["-m" "cementmill.render-html"]}
   :export {:main-opts ["-m" "cementmill.export-run"]}
   :test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner
