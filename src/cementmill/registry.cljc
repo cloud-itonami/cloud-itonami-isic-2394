@@ -25,7 +25,7 @@
   Mill Test Certificate itself (that is `cementmill.operation`'s
   `:actuation/ship-cement-batch`/`:actuation/issue-mill-certificate`,
   always human-gated -- see README `Actuation`)."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (defn- unsigned-certificate
   "Every certificate this actor produces is UNSIGNED -- signature is
@@ -69,7 +69,7 @@
     (throw (ex-info "cement-batch-shipment: jurisdiction required" {})))
   (when (< sequence 0)
     (throw (ex-info "cement-batch-shipment: sequence must be >= 0" {})))
-  (let [shipment-number (str (str/upper-case jurisdiction) "-SHP-" (zero-pad sequence 6))
+  (let [shipment-number (str (str/upper jurisdiction) "-SHP-" (zero-pad sequence 6))
         record {"record_id" shipment-number
                 "kind" "cement-batch-shipment-draft"
                 "batch_id" batch-id
@@ -94,7 +94,7 @@
     (throw (ex-info "mill-certificate: jurisdiction required" {})))
   (when (< sequence 0)
     (throw (ex-info "mill-certificate: sequence must be >= 0" {})))
-  (let [evidence-number (str (str/upper-case jurisdiction) "-MTC-" (zero-pad sequence 6))
+  (let [evidence-number (str (str/upper jurisdiction) "-MTC-" (zero-pad sequence 6))
         record {"record_id" evidence-number
                 "kind" "mill-certificate-draft"
                 "batch_id" batch-id
