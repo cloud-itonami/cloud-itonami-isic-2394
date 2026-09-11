@@ -7,7 +7,7 @@
   with a page derived entirely from a REAL run of this repo's own actor
   stack (`cementmill.operation` -> `cementmill.governor` ->
   `cementmill.store`), driven through `langgraph.graph/run*` exactly the
-  way `cementmill.sim` (`clojure -M:dev:run`) drives it.
+  way `cementmill.sim` (`kbb -M:dev:run`) drives it.
 
   The scenario below is this repo's OWN `cementmill.sim` scenario --
   confirmed BEFORE this file was written to produce a 16-fact ledger
@@ -33,7 +33,7 @@
   `-main` REFUSES to write a page that contains no HARD hold, because a
   console showing no hold is not evidence of a governor.
 
-  Usage: `clojure -M:dev:render-html [out-file]`
+  Usage: `kbb -M:dev:render-html [out-file]`
   (default `docs/samples/operator-console.html`)."
   (:require [jp-go-dds.skin]
             [kotoba.lang.text :as str]

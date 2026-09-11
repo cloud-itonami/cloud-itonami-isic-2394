@@ -139,9 +139,9 @@ Operator console (static sample): `docs/samples/operator-console.html`.
 ## Develop
 
 ```bash
-clojure -M:dev:test
-clojure -M:lint
-clojure -M:dev:run
+kbb -M:dev:test
+kbb -M:lint
+kbb -M:dev:run
 ```
 
 ## License
@@ -160,8 +160,8 @@ Local: open `docs/samples/operator-console.html`.
 ## Export audit package (CLI)
 
 ```bash
-clojure -M:dev:export
-# or: clojure -M:dev:export /tmp/audit-2394
+kbb -M:dev:export
+# or: kbb -M:dev:export /tmp/audit-2394
 ```
 
 Writes CSV files under `out/audit-package/` (or the given directory).

@@ -1,5 +1,5 @@
 (ns cementmill.sim
-  "Demo driver -- `clojure -M:dev:run`. `robotics/simulate-quality-lab-
+  "Demo driver -- `kbb -M:dev:run`. `robotics/simulate-quality-lab-
   cell` now actually runs a real `physics-2d`-backed time-stepped
   press-platen/cube-specimen collision simulation (ADR-2607152000,
   extending automotive's pilot ADR-2607151600) -- see
