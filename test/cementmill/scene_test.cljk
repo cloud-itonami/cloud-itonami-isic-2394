@@ -6,7 +6,7 @@
   JVM/.cljc actor repo (see cementmill.scene's docstring). Direct port
   of autoparts.scene-test's/fab.scene-test's own assertions, adapted
   to a plain cement-batch map."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cementmill.robotics :as robotics]
             [cementmill.scene :as scene]))
 
