@@ -1,0 +1,54 @@
+(ns cementmill.physics-probe-test
+  "The probe is the bot's only source of \"measured\"; these pin that it
+  measures (every run numeric, count = expected), that the numbers come
+  from the simulation (the derived boundaries really straddle the band
+  edges), and that a changed solver would show."
+  (:require [clojure.test :refer [deftest is testing]]
+            [cementmill.physics-probe :as probe]
+            [cementmill.robotics :as robotics]))
+
+(defn- stress [kg]
+  (:sim-peak-compressive-stress-mpa (robotics/press-telemetry-for {:press-platen-mass-kg kg})))
+
+(deftest probe-measures-every-run
+  (let [p (probe/probe)]
+    (is (= "itonami.physical-ai.probe.v1" (:physics-probe/schema p)))
+    (is (pos? (:count p)))
+    (is (= (:count p) (:expected p) (count (:runs p))))
+    (testing "every run carries a numeric stress, force and tick count from the trajectory"
+      (doseq [r (:runs p)]
+        (is (number? (get-in r [:quantities :sim-peak-compressive-stress-mpa])))
+        (is (pos? (get-in r [:quantities :sim-peak-compressive-force-n])))
+        (is (pos? (get-in r [:quantities :ticks])))))))
+
+(deftest stress-rises-with-platen-mass-across-the-sweep
+  (let [runs (->> (:runs (probe/probe))
+                  (remove #(get-in % [:input :specimen-side-mm])))
+        stresses (map #(get-in % [:quantities :sim-peak-compressive-stress-mpa]) runs)]
+    (is (= 4 (count stresses)))
+    (is (apply < stresses))))
+
+(deftest cube-size-reaches-the-trajectory
+  (testing "a bigger cube takes more ticks to reach (CAD geometry is read)"
+    (let [ticks (->> (:runs (probe/probe))
+                     (filter #(= 12.0 (double (get-in % [:input :press-platen-mass-kg]))))
+                     (map (juxt #(get-in % [:input :specimen-side-mm] 50.0)
+                                #(get-in % [:quantities :ticks])))
+                     (sort-by first)
+                     (map second))]
+      (is (= 3 (count ticks)))
+      (is (apply < ticks)))))
+
+(deftest derived-band-boundaries-straddle-the-band-edges
+  (let [{:keys [min-platen-mass-kg-in-band max-platen-mass-kg-in-band band-mpa]} (:derived (probe/probe))
+        {lo :strength-28d-min hi :strength-28d-max} band-mpa]
+    (is (number? min-platen-mass-kg-in-band))
+    (is (number? max-platen-mass-kg-in-band))
+    (is (< min-platen-mass-kg-in-band max-platen-mass-kg-in-band))
+    (is (>= (stress min-platen-mass-kg-in-band) lo))
+    (is (< (stress (* 0.99 min-platen-mass-kg-in-band)) lo))
+    (is (>= (stress max-platen-mass-kg-in-band) hi))
+    (is (< (stress (* 0.99 max-platen-mass-kg-in-band)) hi))))
+
+(deftest bracket-that-does-not-straddle-answers-nil
+  (is (nil? (probe/platen-mass-at-stress-kg 42.5 50.0 100.0 10))))
