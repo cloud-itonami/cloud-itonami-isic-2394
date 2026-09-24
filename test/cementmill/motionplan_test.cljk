@@ -2,7 +2,7 @@
   "cementmill.motionplan/motion-plan-for -- the Cartesian waypoint list
   built from cementmill.robotics/mission-actions's real 3-step
   sequence (ADR-2607996500)."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cementmill.cad :as cad]
             [cementmill.motionplan :as motionplan]
             [cementmill.robotics :as robotics]))

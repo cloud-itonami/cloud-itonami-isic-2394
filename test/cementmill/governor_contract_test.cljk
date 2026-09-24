@@ -21,7 +21,7 @@
   the robotics-missing branch fires instead of the out-of-tolerance
   branch). Tests below assert PRESENCE of the rule each test targets,
   not exclusivity."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [cementmill.store :as store]
             [cementmill.operation :as op]))

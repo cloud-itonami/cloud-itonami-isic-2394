@@ -21,7 +21,7 @@
   than scattered unpredictably, and always bounded in magnitude (never
   exceeding roughly one tick-step's own travel distance, `press-
   closing-velocity-mps * dt`)."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cementmill.cad :as cad]
             [cementmill.robotics :as robotics]))
 

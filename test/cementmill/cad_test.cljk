@@ -7,7 +7,7 @@
   field (a cube has one degree of freedom, not an independent
   length/width/height triple -- see cementmill.cad's own docstring for
   why)."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cementmill.cad :as cad]
             [cementmill.robotics :as robotics]))
 

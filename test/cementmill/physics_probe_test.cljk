@@ -3,7 +3,7 @@
   measures (every run numeric, count = expected), that the numbers come
   from the simulation (the derived boundaries really straddle the band
   edges), and that a changed solver would show."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [cementmill.physics-probe :as probe]
             [cementmill.robotics :as robotics]))
 
